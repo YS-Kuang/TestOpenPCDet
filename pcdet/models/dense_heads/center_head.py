@@ -1,11 +1,48 @@
 import copy
 import numpy as np
 import torch
+import math
 import torch.nn as nn
 from torch.nn.init import kaiming_normal_
 from ..model_utils import model_nms_utils
+from ..backbones_3d.pfe import voxel_set_abstraction
 from ..model_utils import centernet_utils
 from ...utils import loss_utils
+from ...utils import box_utils
+
+class BEVFeatureExtractor(nn.Module): 
+    def __init__(self, pc_start, 
+            voxel_size, out_stride):
+        super().__init__()
+        self.pc_start = pc_start 
+        self.voxel_size = voxel_size
+        self.out_stride = out_stride
+
+    def absl_to_relative(self, absolute):
+        a1 = (absolute[..., 0] - self.pc_start[0]) / self.voxel_size[0] / self.out_stride 
+        a2 = (absolute[..., 1] - self.pc_start[1]) / self.voxel_size[1] / self.out_stride 
+
+        return a1, a2
+
+    def forward(self, example, batch_centers, num_point):
+        batch_size = len(example)
+        ret_maps = [] 
+
+        for batch_idx in range(batch_size):
+            xs, ys = self.absl_to_relative(batch_centers[batch_idx])
+            
+            # N x C 
+            feature_map = voxel_set_abstraction.bilinear_interpolate_torch(example[batch_idx].permute(1,2,0),
+             xs, ys) # (N,512)
+
+            if num_point > 1:
+                section_size = len(feature_map) // num_point
+                feature_map = torch.cat([feature_map[i*section_size: (i+1)*section_size] for i in range(num_point)], dim=1) # (N, 2560)
+                # feature_map = feature_map.reshape(-1, 5, 512)
+                
+            ret_maps.append(feature_map)
+
+        return ret_maps 
 
 
 class SeparateHead(nn.Module):
@@ -91,6 +128,14 @@ class CenterHead(nn.Module):
                     init_bias=-2.19,
                     use_bias=self.model_cfg.get('USE_BIAS_BEFORE_NORM', False)
                 )
+            )
+
+        self.extractor_list = nn.ModuleList()
+        self.extractor_list.append(
+            BEVFeatureExtractor(
+                pc_start = [0, -40], 
+                voxel_size = [0.05, 0.05], 
+                out_stride = 8)
             )
         self.predict_boxes_when_training = predict_boxes_when_training
         self.forward_ret_dict = {}
@@ -303,27 +348,88 @@ class CenterHead(nn.Module):
 
         return ret_dict
 
+    def get_box_center(self, boxes, num_point = 5):
+        # box [List]
+        centers = [] 
+        masks = []
+        for box in boxes:            
+            if num_point == 1 or len(box['pred_boxes']) == 0:
+                centers.append(box['pred_boxes'][:, :3])
+                
+            elif num_point == 5:
+                center2d = box['pred_boxes'][:, :2]
+                height = box['pred_boxes'][:, 2:3]
+                dim2d = box['pred_boxes'][:, 3:5]
+                rotation_y = box['pred_boxes'][:, -1]
+
+                corners = box_utils.center_to_corner_box2d(center2d, dim2d, -rotation_y-math.pi)
+
+                front_middle = torch.cat([(corners[:, 0] + corners[:, 1])/2, height], dim=-1)
+                back_middle = torch.cat([(corners[:, 2] + corners[:, 3])/2, height], dim=-1)
+                left_middle = torch.cat([(corners[:, 0] + corners[:, 3])/2, height], dim=-1)
+                right_middle = torch.cat([(corners[:, 1] + corners[:, 2])/2, height], dim=-1) 
+
+                points = torch.cat([box['pred_boxes'][:, :3], front_middle, back_middle, left_middle, \
+                    right_middle], dim=0)
+
+                centers.append(points)
+                
+                device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+                grid = (torch.linspace(-1, 1, 3, dtype=torch.float32) / 2).to(device)
+                grid_x, grid_y = torch.meshgrid(grid, grid)
+                grid_x = grid_x.reshape(-1, 1)
+                grid_y = grid_y.reshape(-1, 1)
+                template = torch.cat((grid_x,grid_y), dim=1)
+                
+                rotation_y = rotation_y.unsqueeze(1)
+                cur_boxes = torch.cat((center2d, dim2d, rotation_y), dim=1)
+                # if 1 == 1:
+                #   raise ValueError('%d' %cur_boxes.shape[1])
+    
+                mask = cur_boxes[:, None, 2:4].repeat(1, 9, 1) * template[None, :, :]
+                rot_matrix = torch.stack((torch.cos(cur_boxes[:, 4]), torch.sin(cur_boxes[:, 4]), -torch.sin(cur_boxes[:, 4]), torch.cos(cur_boxes[:, 4])),dim=1).view(-1, 2, 2).float()
+                mask = torch.matmul(mask, rot_matrix)
+                mask += cur_boxes[:, None, 0:2]
+                # if 1 == 1:
+                #   raise ValueError('%d' %mask.shape[2])
+                
+                masks.append(mask)
+                
+            else:
+                raise NotImplementedError()
+
+        return centers, masks
+    
+
+
     @staticmethod
-    def reorder_rois_for_refining(batch_size, pred_dicts):
+    def reorder_rois_for_refining(batch_size, pred_dicts, features):
         num_max_rois = max([len(cur_dict['pred_boxes']) for cur_dict in pred_dicts])
         num_max_rois = max(1, num_max_rois)  # at least one faked rois to avoid error
         pred_boxes = pred_dicts[0]['pred_boxes']
+        feature_vector_length = sum([feat[0].shape[-1] for feat in features])
 
         rois = pred_boxes.new_zeros((batch_size, num_max_rois, pred_boxes.shape[-1]))
         roi_scores = pred_boxes.new_zeros((batch_size, num_max_rois))
         roi_labels = pred_boxes.new_zeros((batch_size, num_max_rois)).long()
+        roi_features = pred_boxes.new_zeros((batch_size, num_max_rois, feature_vector_length))
 
         for bs_idx in range(batch_size):
             num_boxes = len(pred_dicts[bs_idx]['pred_boxes'])
-
+            
             rois[bs_idx, :num_boxes, :] = pred_dicts[bs_idx]['pred_boxes']
             roi_scores[bs_idx, :num_boxes] = pred_dicts[bs_idx]['pred_scores']
             roi_labels[bs_idx, :num_boxes] = pred_dicts[bs_idx]['pred_labels']
-        return rois, roi_scores, roi_labels
+            roi_features[bs_idx, :num_boxes] = torch.cat([feat[bs_idx] for feat in features], dim=-1)
+            
+        return rois, roi_scores, roi_labels, roi_features
 
     def forward(self, data_dict):
         spatial_features_2d = data_dict['spatial_features_2d']
         x = self.shared_conv(spatial_features_2d)
+        frame_id = data_dict['frame_id']
+        roi_radar_features = data_dict['radar_features']
+        batch_size = data_dict['batch_size']
 
         pred_dicts = []
         for head in self.heads_list:
@@ -344,12 +450,29 @@ class CenterHead(nn.Module):
             )
 
             if self.predict_boxes_when_training:
-                rois, roi_scores, roi_labels = self.reorder_rois_for_refining(data_dict['batch_size'], pred_dicts)
-                data_dict['rois'] = rois
-                data_dict['roi_scores'] = roi_scores
-                data_dict['roi_labels'] = roi_labels
-                data_dict['has_class_labels'] = True
+              features = []
+              centers, masks = self.get_box_center(pred_dicts, num_point=5)
+              ### check centers and mask
+              # if 1 == 1:
+              #     raise ValueError('%s %s %.4f %.4f' %(frame_id[0], frame_id[2], centers[2][0][0], centers[2][0][1]))
+              for module in self.extractor_list:
+                feature = module.forward(spatial_features_2d, centers, num_point=5) # (N, 512*5)
+                features.append(feature)
+              # ## check features list: :(1,4,N,5,412)
+              # if 1 == 1:
+              #   raise ValueError('%s' %(features[0][0].shape[1]))  
+              rois, roi_scores, roi_labels, roi_features = self.reorder_rois_for_refining(data_dict['batch_size'], pred_dicts, features)
+              roi_features = roi_features.reshape(batch_size, -1, 5, 512)
+              ## check roi features
+              # if 1 == 1:
+              #   raise ValueError('%s %s %d' %(frame_id[0], frame_id[1], roi_features.shape[1]))
+              data_dict['rois'] = rois
+              data_dict['roi_scores'] = roi_scores
+              data_dict['roi_labels'] = roi_labels
+              data_dict['roi_features'] = roi_features #(B, N, 5, 512)
+              data_dict['roi_radar_features'] = roi_radar_features #(B, N, 5, 128)
+              data_dict['has_class_labels'] = True
             else:
-                data_dict['final_box_dicts'] = pred_dicts
+              data_dict['final_box_dicts'] = pred_dicts
 
         return data_dict
