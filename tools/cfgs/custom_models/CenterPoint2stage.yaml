@@ -5,7 +5,7 @@ DATA_CONFIG:
 
 
 MODEL:
-    NAME: CustomNet
+    NAME: CenterPoint2stage
 
     VFE:
         NAME: MeanVFE
@@ -71,7 +71,7 @@ MODEL:
 
 
     ROI_HEAD:
-        NAME: CenterPoint2stage
+        NAME: Center2stageHead
         CLASS_AGNOSTIC: True
 
         SHARED_FC: [256, 256]
