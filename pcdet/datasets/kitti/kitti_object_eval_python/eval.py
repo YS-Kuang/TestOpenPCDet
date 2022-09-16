@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Wed May 18 09:23:30 2022
-
-@author: kuang
-"""
-
 import io as sysio
 
 import numba
@@ -392,7 +384,8 @@ def calculate_iou_partly(gt_annos, dt_annos, metric, num_parts=5):
             loc = np.concatenate([a["location"] for a in gt_annos_part], 0)
             dims = np.concatenate([a["dimensions"] for a in gt_annos_part], 0)
             rots = np.concatenate([a["rotation_y"] for a in gt_annos_part], 0)
-            gt_boxes = np.concatenate([loc, dims, rots[..., np.newaxis]], axis=1)
+            gt_boxes = np.concatenate([loc, dims, -(np.pi / 2 + rots[..., np.newaxis])], axis = 1)
+            
             
             loc = np.concatenate([a["location"] for a in dt_annos_part], 0)
             dims = np.concatenate([a["dimensions"] for a in dt_annos_part], 0)
