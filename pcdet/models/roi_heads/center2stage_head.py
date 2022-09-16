@@ -1,24 +1,9 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat May 21 09:52:47 2022
-
-@author: 54756
-"""
-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Fri May 20 10:46:36 2022
-
-@author: kuang
-"""
-
 import torch
 import torch.nn as nn
 from .roi_head_template import RoIHeadTemplate
 
 
-class CustomNetHead(RoIHeadTemplate):
+class Center2stageHead(RoIHeadTemplate):
     def __init__(self, model_cfg, input_channels, num_class, code_size, **kwargs):
         super().__init__(num_class=num_class, model_cfg=model_cfg)
         self.model_cfg = model_cfg
