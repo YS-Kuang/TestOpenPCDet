@@ -46,7 +46,13 @@ def train_one_epoch(model, optimizer, train_loader, model_func, lr_scheduler, ac
         if tb_log is not None:
             tb_log.add_scalar('meta_data/learning_rate', cur_lr, accumulated_iter)
 
-        model.train()
+        model.train(mode=True)
+
+        for i, p in enumerate(model.modules()):
+          if i <= 141:
+            if isinstance(p, torch.nn.BatchNorm1d) or isinstance(p, torch.nn.BatchNorm2d):
+              p.eval()
+
         optimizer.zero_grad()
 
         loss, tb_dict, disp_dict = model_func(model, batch)
@@ -221,3 +227,4 @@ def save_checkpoint(state, filename='checkpoint'):
         torch.save(state, filename, _use_new_zipfile_serialization=False)
     else:
         torch.save(state, filename)
+
