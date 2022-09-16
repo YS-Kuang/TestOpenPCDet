@@ -462,7 +462,7 @@ class CenterHead(nn.Module):
               # if 1 == 1:
               #   raise ValueError('%s' %(features[0][0].shape[1]))  
               rois, roi_scores, roi_labels, roi_features = self.reorder_rois_for_refining(data_dict['batch_size'], pred_dicts, features)
-              roi_features = roi_features.reshape(batch_size, -1, 5, 512)
+              roi_features = roi_features.reshape(batch_size, -1, 5, 512) # turn off when centerpoint2stage
               ## check roi features
               # if 1 == 1:
               #   raise ValueError('%s %s %d' %(frame_id[0], frame_id[1], roi_features.shape[1]))
