@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 from ...utils import box_coder_utils, common_utils, loss_utils
 from ..model_utils.model_nms_utils import class_agnostic_nms
-from .target_assigner.proposal_target_layer import ProposalTargetLayer
+from .target_assigner.proposal_target_layer_withradar import ProposalTargetLayer
 
 
 class RoIHeadTemplate(nn.Module):
