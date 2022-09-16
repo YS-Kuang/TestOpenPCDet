@@ -5,7 +5,8 @@ import torch.nn.functional as F
 
 from ...utils import box_coder_utils, common_utils, loss_utils
 from ..model_utils.model_nms_utils import class_agnostic_nms
-from .target_assigner.proposal_target_layer_withradar import ProposalTargetLayer
+from .target_assigner.proposal_target_layer import ProposalTargetLayer # turn on when centerpoint2stage
+from .target_assigner.proposal_target_layer_withradar import ProposalTargetLayer # turn on when customnet
 
 
 class RoIHeadTemplate(nn.Module):
