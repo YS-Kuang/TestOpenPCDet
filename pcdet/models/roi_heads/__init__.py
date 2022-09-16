@@ -5,6 +5,7 @@ from .second_head import SECONDHead
 from .voxelrcnn_head import VoxelRCNNHead
 from .roi_head_template import RoIHeadTemplate
 from .customnet_head import CustomNetHead
+from .center2stage_head import Center2stageHead
 
 
 __all__ = {
@@ -14,5 +15,6 @@ __all__ = {
     'SECONDHead': SECONDHead,
     'PointRCNNHead': PointRCNNHead,
     'VoxelRCNNHead': VoxelRCNNHead,
-    'CustomNetHead': CustomNetHead
+    'CustomNetHead': CustomNetHead,
+    'Center2stageHead': Center2stageHead
 }
