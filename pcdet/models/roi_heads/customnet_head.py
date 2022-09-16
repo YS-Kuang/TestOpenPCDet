@@ -77,7 +77,7 @@ class CustomNetHead(RoIHeadTemplate):
 
         # RoI aware pooling
             
-        pooled_features = torch.cat((batch_dict['rpi_features'], batch_dict['roi_radar_features']), dim=-1)
+        pooled_features = torch.cat((batch_dict['roi_features'], batch_dict['roi_radar_features']), dim=-1)
         
         pooled_features = pooled_features.reshape(-1, 1, 5*640).contiguous()  # (BxN, 1, C)
 
