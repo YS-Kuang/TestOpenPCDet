@@ -1,23 +1,8 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat May 21 10:08:08 2022
-
-@author: 54756
-"""
-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Feb  4 13:13:47 2022
-
-@author: kuang
-"""
-
 from .detector3d_template import Detector3DTemplate
 import torch
 
 
-class CustomNet(Detector3DTemplate):
+class Centerpoint2stage(Detector3DTemplate):
     def __init__(self, model_cfg, num_class, dataset):
         super().__init__(model_cfg=model_cfg, num_class=num_class, dataset=dataset)
         self.module_list = self.build_networks()
