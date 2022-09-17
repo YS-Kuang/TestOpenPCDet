@@ -456,7 +456,7 @@ class CenterHead(nn.Module):
               # if 1 == 1:
               #     a = centers[0].shpae[0] / 5
               #     b = 0 + 0 * a
-              #     raise ValueError('%.4f %.4f %.4f %.4f' %(centers[0][b][0], centers[0][b][1], masks[0][0][0][0], masks[0][0][0][1]))
+              #     raise ValueError('%.4f %.4f %.4f %.4f' %(centers[0][b][0], centers[0][b][1], masks[0][0][4][0], masks[0][0][4][1]))
               for module in self.extractor_list:
                 feature = module.forward(spatial_features_2d, centers, num_point=5) # (N, 512*5)
                 features.append(feature)
