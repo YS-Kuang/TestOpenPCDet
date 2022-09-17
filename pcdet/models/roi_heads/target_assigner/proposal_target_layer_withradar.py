@@ -87,7 +87,7 @@ class ProposalTargetLayer(nn.Module):
         batch_roi_scores = rois.new_zeros(batch_size, self.roi_sampler_cfg.ROI_PER_IMAGE)
         batch_roi_labels = rois.new_zeros((batch_size, self.roi_sampler_cfg.ROI_PER_IMAGE), dtype=torch.long)
         batch_roi_features = roi_features.new_zeros(batch_size, self.roi_sampler_cfg.ROI_PER_IMAGE, 5, roi_features.shape[-1])
-        batch_roi_radar_features = roi_radar_features.new_zeros(batch_size, self.roi_sampler_cfg.ROI_PER_IMAGE, 5, roi_radar_features.shape[-1])
+        batch_roi_radar_features = roi_radar_features.new_zeros(batch_size, self.roi_sampler_cfg.ROI_PER_IMAGE, roi_radar_features.shape[2], roi_radar_features.shape[-1])
         
         for index in range(batch_size):
             cur_roi, cur_gt, cur_roi_labels, cur_roi_scores, cur_roi_features, cur_roi_radar_features = \
