@@ -24,7 +24,7 @@ class CustomNetHead(RoIHeadTemplate):
         for k in range(0, self.radar_channels.__len__()):
             radar_modules.extend([
                 nn.Conv2d(radar_inchannel, self.radar_channels[k], self.conv2d_kernel_size, stride=1, padding=1, dilation=1, groups=1, bias=False, padding_mode='zeros'),
-                nn.MaxPool2d(self.pool_kernel_size_2d, self.stride=max_pool_stride_2d, padding=0, dilation=1, return_indices=False, ceil_mode=False),
+                nn.MaxPool2d(self.pool_kernel_size_2d, stride=self.max_pool_stride_2d, padding=0, dilation=1, return_indices=False, ceil_mode=False),
                 nn.ReLU(),
                 nn.BatchNorm2d(self.radar_channels[k])
                 ])
